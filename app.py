@@ -4,7 +4,7 @@ import pandas as pd
 import hashlib
 
 # =============================
-# PAGE CONFIG (Bloomberg Style)
+# PAGE CONFIG
 # =============================
 st.set_page_config(
     page_title="MacroMoney | Macro Intelligence Engine",
@@ -16,17 +16,17 @@ st.markdown("""
 body { background-color: #0e1117; color: #e6e6e6; }
 .block-container { padding-top: 1rem; }
 h1, h2, h3 { color: #f5c518; }
-.metric-box {
+.section {
     background-color: #161b22;
-    padding: 15px;
-    border-radius: 8px;
-    border-left: 4px solid #f5c518;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================
-# DETERMINISTIC SEMANTIC ENGINE
+# SEMANTIC ENGINE (STABLE DEMO)
 # =============================
 def embed_text(text, dim=384):
     h = hashlib.sha256(text.lower().encode()).digest()
@@ -38,31 +38,32 @@ def cosine_sim(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 # =============================
-# MACRO ARCHETYPES (ANCHORS)
+# MACRO ARCHETYPES
 # =============================
 ARCHETYPES = {
-    "Geopolitical Shock": embed_text("war conflict assassination military sanctions instability"),
+    "Geopolitical Shock": embed_text("war assassination conflict sanctions military instability"),
     "Monetary Policy Shift": embed_text("interest rates central bank inflation tightening easing"),
-    "Commodity Shock": embed_text("gold oil commodities supply shortage price spike"),
+    "Commodity Shock": embed_text("gold oil commodities supply shock price spike"),
     "Corporate Earnings": embed_text("earnings profit revenue downgrade guidance"),
-    "Financial Crisis": embed_text("bank collapse liquidity credit default crisis"),
+    "Financial Crisis": embed_text("bank collapse liquidity credit crisis"),
     "Trade & Globalization": embed_text("trade deal tariffs exports imports agreement"),
     "Local / Noise": embed_text("celebrity local unrelated minor event")
 }
 
+ARCHETYPE_EXPLANATION = {
+    "Geopolitical Shock": "Geopolitical shocks increase uncertainty and risk aversion across global markets.",
+    "Monetary Policy Shift": "Changes in monetary policy directly affect liquidity, borrowing costs, and asset valuations.",
+    "Commodity Shock": "Commodity shocks signal inflationary pressure or supply constraints in the global economy.",
+    "Corporate Earnings": "Earnings events primarily impact equity valuations and investor sentiment.",
+    "Financial Crisis": "Financial crises trigger systemic risk and capital flight toward safe-haven assets.",
+    "Trade & Globalization": "Trade developments influence growth expectations and cross-border capital flows.",
+    "Local / Noise": "This event lacks sufficient macroeconomic relevance to impact diversified portfolios."
+}
+
 # =============================
-# PORTFOLIO SETUP
+# PORTFOLIO & IMPACT MODEL
 # =============================
 ASSETS = ["Equities", "Bonds", "Gold", "Crypto", "Commodities", "ETFs"]
-
-BASE_PORTFOLIO = {
-    "Equities": 0.40,
-    "Bonds": 0.30,
-    "Gold": 0.10,
-    "Crypto": 0.05,
-    "Commodities": 0.10,
-    "ETFs": 0.05
-}
 
 IMPACT_MATRIX = {
     "Geopolitical Shock": {"Equities": -0.20, "Bonds": 0.15, "Gold": 0.30},
@@ -74,14 +75,31 @@ IMPACT_MATRIX = {
 }
 
 # =============================
-# SIDEBAR CONTROLS
+# SIDEBAR — USER PORTFOLIO
 # =============================
-st.sidebar.title("Macro Controls")
-capital = st.sidebar.number_input("Total Capital ($)", min_value=1000, value=100000, step=1000)
+st.sidebar.title("Portfolio Setup")
 
+capital = st.sidebar.number_input(
+    "Total Capital ($)", min_value=1000, value=100000, step=1000
+)
+
+st.sidebar.markdown("### Initial Allocation (%)")
+
+weights = {}
+total_weight = 0
+
+for asset in ASSETS:
+    w = st.sidebar.slider(asset, 0, 100, 100 // len(ASSETS))
+    weights[asset] = w / 100
+    total_weight += w
+
+if total_weight != 100:
+    st.sidebar.error("Total allocation must equal 100%")
+    st.stop()
+
+st.sidebar.markdown("### Investment Horizon")
 horizon = st.sidebar.selectbox(
-    "Investment Horizon",
-    ["Short (≤1 year)", "Medium (1–3 years)", "Long (3+ years)"]
+    "", ["Short (≤1 year)", "Medium (1–3 years)", "Long (3+ years)"]
 )
 
 thresholds = {
@@ -95,12 +113,11 @@ rebalance_threshold = thresholds[horizon]
 # MAIN UI
 # =============================
 st.title("MacroMoney — Macro Intelligence Engine")
-st.caption("Semantic macro analysis • Severity scoring • Portfolio rebalancing")
+st.caption("Macro reasoning • Severity scoring • Portfolio intelligence")
 
 headline = st.text_area(
     "Enter any news headline or macro event:",
-    height=90,
-    placeholder="Example: Gold prices hit all-time high amid global inflation fears"
+    height=90
 )
 
 if st.button("Analyze Macro Impact"):
@@ -108,26 +125,28 @@ if st.button("Analyze Macro Impact"):
         st.warning("Please enter a news event.")
     else:
         news_vec = embed_text(headline)
-
         scores = {k: cosine_sim(news_vec, v) for k, v in ARCHETYPES.items()}
         archetype = max(scores, key=scores.get)
         severity = min(1.0, max(0.0, scores[archetype]))
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Detected Archetype", archetype)
-        col2.metric("Severity Index", round(severity, 2))
-        col3.metric("Rebalance Threshold", rebalance_threshold)
+        st.markdown("## Macro Assessment")
 
-        st.subheader("Portfolio Decision")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Detected Archetype", archetype)
+        c2.metric("Severity Index", round(severity, 2))
+        c3.metric("Rebalance Threshold", rebalance_threshold)
 
-        new_portfolio = BASE_PORTFOLIO.copy()
+        new_portfolio = weights.copy()
         explanation = []
 
+        explanation.append(f"**Macro Interpretation:** {ARCHETYPE_EXPLANATION[archetype]}")
+
         if archetype == "Local / Noise" or severity < rebalance_threshold:
-            st.info("Impact assessed as insufficient to justify portfolio rebalancing.")
             explanation.append(
-                "The event does not meet the macro severity threshold required to alter a diversified portfolio."
+                "The severity of this event is not high enough to justify portfolio changes "
+                "given your investment horizon."
             )
+            st.info("No portfolio rebalancing triggered.")
         else:
             impact = IMPACT_MATRIX.get(archetype, {})
             for asset, delta in impact.items():
@@ -137,39 +156,48 @@ if st.button("Analyze Macro Impact"):
             for k in new_portfolio:
                 new_portfolio[k] /= total
 
-            st.success("Macro impact significant — portfolio rebalanced.")
+            explanation.append(
+                "Historically, markets respond to this type of event by reallocating capital "
+                "toward assets that offer protection or benefit from the macro shift."
+            )
 
-            explanation.extend([
-                f"The system classified this event as **{archetype}** using semantic similarity.",
-                f"Severity score of **{round(severity,2)}** reflects historical market reactions to similar events.",
-                f"Given your **{horizon.lower()} investment horizon**, rebalancing was triggered.",
-                "Asset weights were adjusted using historical risk-on / risk-off transmission logic."
-            ])
+            for asset, delta in impact.items():
+                direction = "increased" if delta > 0 else "reduced"
+                explanation.append(
+                    f"Exposure to **{asset}** was {direction} due to its historical behavior during similar events."
+                )
+
+            st.success("Portfolio rebalanced based on macro severity.")
 
         # =============================
-        # OUTPUT TABLE
+        # PORTFOLIO TABLE
         # =============================
         df = pd.DataFrame({
             "Asset": ASSETS,
-            "Base Weight": [BASE_PORTFOLIO[a] for a in ASSETS],
+            "Initial Weight": [weights[a] for a in ASSETS],
             "New Weight": [new_portfolio[a] for a in ASSETS],
             "Capital ($)": [new_portfolio[a] * capital for a in ASSETS]
         })
 
+        st.markdown("## Portfolio Allocation")
         st.dataframe(
             df.style.format({
-                "Base Weight": "{:.2%}",
+                "Initial Weight": "{:.2%}",
                 "New Weight": "{:.2%}",
                 "Capital ($)": "${:,.0f}"
             }),
             use_container_width=True
         )
 
-        st.subheader("Explanation & Logic")
+        # =============================
+        # EXPLANATION PANEL
+        # =============================
+        st.markdown("## Explanation & Market Logic")
         for e in explanation:
             st.write("•", e)
 
         st.caption(
-            "Demo note: This version uses deterministic semantic embeddings. "
-            "Production version replaces this with transformer embeddings calibrated on historical returns."
+            "Demo note: Semantic engine is deterministic for stability. "
+            "Production version will use transformer embeddings calibrated on historical returns."
         )
+
