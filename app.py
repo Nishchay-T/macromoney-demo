@@ -33,7 +33,23 @@ def embed_text(text):
         headers={"Authorization": f"Bearer {HF_API_KEY}"},
         json={"inputs": text}
     )
-    return np.mean(response.json(), axis=0)
+
+    data = response.json()
+
+    # Handle model loading / API errors
+    if isinstance(data, dict) and "error" in data:
+        st.warning("Embedding model is loading. Please retry in a few seconds.")
+        st.stop()
+
+    embedding = np.array(data)
+
+    # If HF returns a single vector
+    if embedding.ndim == 1:
+        return embedding
+
+    # If HF returns token-level embeddings
+    return embedding.mean(axis=0)
+
 
 def severity_from_axes(axes):
     return np.clip(np.mean(axes), 0, 1)
